@@ -17,6 +17,7 @@ import com.bluesaltapp.common.rabbit_messages.BillingMessage;
 import com.bluesaltapp.common.rabbit_messages.FundedMessage;
 import com.bluesaltapp.common.rabbit_messages.RQMessage;
 import com.bluesaltapp.common.service.BaseValidationService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.message.SimpleMessage;
@@ -41,16 +42,17 @@ public class BillingService extends BaseValidationService {
     public BillingDTO fundCustomerAccount(BillingVM request) throws CustomException {
         validateSaveEntity(request, "amount", "customerId", "id");
 
-        /*ResponsePayload<FraudResponse> fraudResponse = (ResponsePayload<FraudResponse>) restTemplate.getForObject("http://localhost:8085/api/v1/fraud-check/{customerId}",
-                Object.class, request.customerId());
+        ObjectMapper objectMapper = new ObjectMapper();
+        ResponsePayload<?> fraudResponse =  restTemplate.getForObject("http://localhost:8085/api/v1/fraud-check/{customerId}",
+                ResponsePayload.class, request.customerId());
 
         fraudResponse.validateDate();
-        FraudResponse response = fraudResponse.getData().get(0);
+        FraudResponse response = objectMapper.convertValue(fraudResponse.getData().get(0), FraudResponse.class) ;
 
         if (response.isFraud()) {
             GlobalMessage message = new GlobalMessage("Customer is fraudulent", "", Message.Severity.ERROR );
             throw new CustomException(message);
-        }*/
+        }
 
         Billing billing = Billing.builder()
                 .status(BillingStatus.Pending)
