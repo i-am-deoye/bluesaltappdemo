@@ -7,10 +7,12 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.logging.log4j.message.SimpleMessage;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageListener;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.utils.SerializationUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -19,30 +21,33 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 @AllArgsConstructor
-@Service
 @Slf4j
-public class QueueMessageListener  {
+public class QueueMessageListener implements MessageListener {
 
     private RabbitTemplate rabbitTemplate;
 
-    @RabbitListener(queues = RabbitMQConfiguration.QUEUE)
-    public void receiveMessage(final RQMessage<BillingMessage> rqMessage) {
-        BillingMessage message = rqMessage.getMessage();
+    @Override
+    public void onMessage(Message message1) {
+        RQMessage<BillingMessage> rqMessage = (RQMessage<BillingMessage>) SerializationUtils.deserialize(message1.getBody());
+        final BillingMessage message = rqMessage.getMessage();
         log.info("receiveMessage worker {}", rqMessage);
-        final ScheduledExecutorService executorService = Executors.newSingleThreadScheduledExecutor();
-        executorService.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                FundedMessage fundedMessage = FundedMessage
-                        .builder()
-                        .amount("1000")
-                        .isSuccessfull(true)
-                        .transactionId(message.getTransactionId())
-                        .build();
+        try {
+            Thread.sleep(100);
+            FundedMessage fundedMessage = FundedMessage
+                    .builder()
+                    .amount("1000")
+                    .isSuccessfull(true)
+                    .transactionId(message.getTransactionId())
+                    .build();
 
-                RQMessage rqMessage = RQMessage.message(fundedMessage);
-                rabbitTemplate.convertAndSend("TOPIC_BILLING_EXCHANGE", "TOPIC_BILLING_ROUTER", rqMessage);
-            }
-        }, 100, 0, TimeUnit.MILLISECONDS);
+            RQMessage sendMessageBody = RQMessage.message(fundedMessage);
+            byte[] body = SerializationUtils.serialize(sendMessageBody);
+            Message sendMessage = new Message(body);
+
+            rabbitTemplate.convertAndSend("TOPIC_BILLING_EXCHANGE", "TOPIC_BILLING_ROUTER", sendMessage);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
+
 }

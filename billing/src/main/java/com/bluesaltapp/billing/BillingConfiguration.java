@@ -1,4 +1,4 @@
-package com.bluesaltapp.billing.core;
+package com.bluesaltapp.billing;
 
 
 import org.springframework.amqp.rabbit.core.RabbitTemplate;

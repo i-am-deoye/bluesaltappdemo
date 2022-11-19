@@ -1,16 +1,19 @@
 package com.bluesaltapp.billingworker;
 
 import org.springframework.amqp.core.*;
+import org.springframework.amqp.rabbit.annotation.EnableRabbit;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.MessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
 
 @Configuration
+@EnableRabbit
 public class RabbitMQConfiguration {
     public static final String QUEUE = "WORKERI_QUEUE";
     private static final String TOPIC_EXCHANGE = "TOPIC_WORKERI_EXCHANGE";
@@ -45,17 +48,19 @@ public class RabbitMQConfiguration {
         factory.setPassword("guest");
         return factory;
     }
-//
-//    @Bean
-//    public RabbitTemplate rabbitTemplate() {
-//        return new RabbitTemplate();
-//    }
 
     @Bean
-    MessageListenerContainer listenerContainer() {
+    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
+        RabbitTemplate template = new RabbitTemplate(connectionFactory);
+        return template;
+    }
+
+    @Bean
+    MessageListenerContainer listenerContainer(RabbitTemplate rabbitTemplate) {
         SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
         container.setConnectionFactory(connectionFactory());
         container.setQueues(queue());
+        container.setMessageListener(new QueueMessageListener(rabbitTemplate));
         return container;
     }
 }

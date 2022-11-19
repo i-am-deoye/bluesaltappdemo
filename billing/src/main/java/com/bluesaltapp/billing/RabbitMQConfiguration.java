@@ -1,14 +1,19 @@
-package com.bluesaltapp.billing.core;
+package com.bluesaltapp.billing;
 
+import com.bluesaltapp.billing.service.BillingService;
 import org.springframework.amqp.core.*;
+import org.springframework.amqp.rabbit.annotation.EnableRabbit;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.rabbit.listener.MessageListenerContainer;
 import org.springframework.amqp.rabbit.listener.SimpleMessageListenerContainer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
+@EnableRabbit
 public class RabbitMQConfiguration {
     public static final String QUEUE = "BILLING_QUEUE";
     private static final String TOPIC_EXCHANGE = "TOPIC_BILLING_EXCHANGE";
@@ -44,12 +49,19 @@ public class RabbitMQConfiguration {
         return factory;
     }
 
+    @Bean
+    public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory) {
+        RabbitTemplate template = new RabbitTemplate(connectionFactory);
+        return template;
+    }
+
 
     @Bean
-    MessageListenerContainer listenerContainer() {
+    MessageListenerContainer listenerContainer(BillingService billingService) {
         SimpleMessageListenerContainer container = new SimpleMessageListenerContainer();
         container.setConnectionFactory(connectionFactory());
         container.setQueues(queue());
+        container.setMessageListener(billingService);
         return container;
     }
 }

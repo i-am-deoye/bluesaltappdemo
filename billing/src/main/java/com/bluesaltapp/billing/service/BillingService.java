@@ -1,7 +1,7 @@
 package com.bluesaltapp.billing.service;
 
 
-import com.bluesaltapp.billing.core.RabbitMQConfiguration;
+import com.bluesaltapp.billing.RabbitMQConfiguration;
 import com.bluesaltapp.billing.core.response.FraudResponse;
 import com.bluesaltapp.billing.model.Billing;
 import com.bluesaltapp.billing.model.BillingDTO;
@@ -9,7 +9,6 @@ import com.bluesaltapp.billing.model.BillingStatus;
 import com.bluesaltapp.billing.model.BillingVM;
 import com.bluesaltapp.billing.repository.BillingRepository;
 import com.bluesaltapp.common.GlobalMessage;
-import com.bluesaltapp.common.IResponsePayload;
 import com.bluesaltapp.common.Message;
 import com.bluesaltapp.common.ResponsePayload;
 import com.bluesaltapp.common.exception.CustomException;
@@ -20,20 +19,19 @@ import com.bluesaltapp.common.service.BaseValidationService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.logging.log4j.message.SimpleMessage;
 import org.springframework.amqp.core.MessageListener;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.amqp.utils.SerializationUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Optional;
 import java.util.UUID;
 
 @AllArgsConstructor
 @Service
 @Slf4j
-public class BillingService extends BaseValidationService {
+public class BillingService extends BaseValidationService implements MessageListener {
 
     private final BillingRepository billingRepository;
     private final RabbitTemplate rabbitTemplate;
@@ -70,7 +68,10 @@ public class BillingService extends BaseValidationService {
                 .build();
 
         RQMessage rqMessage = RQMessage.message(message);
-        rabbitTemplate.convertAndSend("TOPIC_WORKER_EXCHANGE", "TOPIC_WORKER_ROUTER", rqMessage);
+        byte[] body = SerializationUtils.serialize(rqMessage);
+        org.springframework.amqp.core.Message message1 = new org.springframework.amqp.core.Message(body);
+
+        rabbitTemplate.convertAndSend("TOPIC_WORKERI_EXCHANGE", "TOPIC_WORKERI_ROUTER", message1);
 
 
         return BillingDTO.builder()
@@ -82,8 +83,10 @@ public class BillingService extends BaseValidationService {
                 .build();
     }
 
-    @RabbitListener(queues = RabbitMQConfiguration.QUEUE)
-    public void receiveMessage(final RQMessage<FundedMessage> rqMessage) {
+
+    @Override
+    public void onMessage(org.springframework.amqp.core.Message message1) {
+        RQMessage<FundedMessage> rqMessage = (RQMessage<FundedMessage>) SerializationUtils.deserialize(message1.getBody());
         log.info("receiveMessage {}", rqMessage);
         FundedMessage message = rqMessage.getMessage();
         Billing billing = billingRepository.findBillingByTransactionId(message.getTransactionId()).get();
@@ -93,5 +96,4 @@ public class BillingService extends BaseValidationService {
             billingRepository.save(billing);
         }
     }
-
 }
